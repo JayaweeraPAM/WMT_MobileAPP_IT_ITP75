@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 // In-memory fallback database for development
 class InMemoryDB {
   constructor() {
@@ -16,9 +19,15 @@ class InMemoryDB {
 
   collection(name) {
     return {
-      find: async () => ({
-        toArray: async () => this.collections[name] || [],
-      }),
+      find: (query) => {
+        const collection = this.collections[name] || [];
+        const matches = !query || Object.keys(query).length === 0
+          ? collection
+          : collection.filter(doc => Object.entries(query).every(([k, v]) => doc[k] === v));
+        return {
+          toArray: async () => matches,
+        };
+      },
       findOne: async (query) => {
         const collection = this.collections[name] || [];
         if (query._id) {
@@ -81,7 +90,7 @@ let client = null;
 let db = null;
 let isInMemory = false;
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/tutors_db';
+const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = 'tutors_db';
 
 export async function connectDB() {
@@ -92,6 +101,10 @@ export async function connectDB() {
     }
 
     try {
+      if (!MONGODB_URI) {
+        throw new Error('MONGODB_URI is not defined in the environment variables (.env file)');
+      }
+
       const { MongoClient, ServerApiVersion } = await import('mongodb');
       
       client = new MongoClient(MONGODB_URI, {
@@ -235,3 +248,4 @@ export async function disconnectDB() {
     console.log('Database disconnected');
   }
 }
+
